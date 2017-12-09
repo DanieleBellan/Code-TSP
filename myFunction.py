@@ -1,9 +1,16 @@
 import random
+import re
+import time
 import numpy as np
 import matplotlib.pyplot as plt 
 import matplotlib.patches as mpatches
 import math
 import itertools
+from random import randint
+
+from math import hypot
+from geometricFunction import minimum_bounding_rectangle
+from geometricFunction import area
 def distance(p1,p2): #compute the euclidean distance between two points
     return math.hypot(p1[0]-p2[0],p2[1]-p1[1]) 
 
@@ -58,7 +65,11 @@ def greedyPath(Points): #very greedy approach: select the shortest distance from
                  j=n+1 #exit from the cycle
               #print "temporaty path", path, "temporaty shortest", shortest
 	if path<shortest: 
-	   route=pos
+           route=[]
+    	   for i in range(0,n):
+               route.append(Points[pos[i],:])
+           route=np.reshape(route, (n,-1))
+	   #route=pos
     	shortest = min(shortest, path)
         path=0
         Adj_mod=Adj+1000000000*np.identity(n) 
@@ -80,36 +91,65 @@ def optPath(Points): #find the optimal path. DO NOT USE WITH GREAT(>10) number o
             if path>shortest:
                i=n+1
 	if path<shortest:
-           shortest=path
-	   route=p
+           shortest=path 
+           route=[]
+	   for i in range(0,n):
+               route.append(Points[p[i],:])
+           route=np.reshape(route, (n,-1))#route.append(p)
+           #route=np.reshape(route, (n,-1))
         path=0
     return shortest, route
 
-def printPath(Points,route):
+def randPath(Points): #find the optimal path using random approach
+    [greedy_cost,greedy_route]=greedyPath(Points) #we use the greedy result as the starting points
+    n = max(np.shape(Points))
+    #Adj=euclTsp(Points)
+    shortest = greedy_cost
+    path=0
+    j=0
+    route=greedy_route
+    start_time = time.time()
+   # Already_had_permutations=[]
+    while (time.time()-start_time)<30 :
+              #path=path+distance(Points[random_permutation[i]],Points[random_permutation[i+1]])
+              #p= np.delete(p, indexes, axis=0) QUalcosa per evitare le ripetizioni
+    	  np.random.shuffle(Points)
+	  for i in range(0,n-1):
+	      path=path+distance(Points[i],Points[i+1])
+              if path>shortest:
+                 i=n+1
+	  if path<shortest:
+             shortest=path
+             route=[]
+ 	     route.append(Points)
+             route=np.reshape(route, (n,-1))
+          path=0
+    return shortest, route          
 
+def printPath(Points,route):
     x = Points[:,0]
     y = Points[:,1]
     n=len(x)
-#ax.set_ylim(0,10)
     plt.scatter(x,y)
     plt.xlabel('x-axis')
     plt.ylabel('y-axis')
-    for i,j in zip(x,y):#range(0,len(x)):
+    for i,j in zip(x,y):
         plt.annotate((i,j), xy=(i,j) )
-#plt.show()
     print "Route is",
     for i in range(0,len(route)):
         print route[i], 
         if i!=len(route)-1: 
            print "->",
     print "\n"
+    '''
     RoutePoints=[] #Build the route as a succession of points
     for i in range(0,len(route)):
         RoutePoints.append([x[route[i]],y[route[i]]])
     RoutePoints=np.reshape(RoutePoints, (n,-1)) #reshape the matrix as Nx2
     print RoutePoints
-    x= RoutePoints[:,0]
-    y=RoutePoints[:,1]
+    '''
+    x=route[:,0]
+    y=route[:,1]
     k=0
     temp=0
     for i,j in zip(x,y):
@@ -128,12 +168,8 @@ def printTwoPaths(Points,route1,route2):
     plt.ylabel('y-axis')
     for i,j in zip(x,y):#range(0,len(x)):
         plt.annotate((i,j), xy=(i,j) )
-    RoutePoints=[] #Build the route as a succession of points
-    for i in range(0,len(route1)):
-        RoutePoints.append([x[route1[i]],y[route1[i]]])
-    RoutePoints=np.reshape(RoutePoints, (n,-1)) #reshape the matrix as Nx2
-    x= RoutePoints[:,0]
-    y=RoutePoints[:,1]
+    x= route1[:,0]
+    y=route1[:,1]
     k=0
     temp=0
     for i,j in zip(x,y):
@@ -149,12 +185,8 @@ def printTwoPaths(Points,route1,route2):
     plt.ylabel('y-axis')
     for i,j in zip(x,y):#range(0,len(x)):
         plt.annotate((i,j), xy=(i,j) )
-    RoutePoints=[] #Build the route as a succession of points
-    for i in range(0,len(route2)):
-        RoutePoints.append([x[route2[i]],y[route2[i]]])
-    RoutePoints=np.reshape(RoutePoints, (n,-1)) #reshape the matrix as Nx2
-    x= RoutePoints[:,0]
-    y=RoutePoints[:,1]
+    x= route2[:,0]
+    y=route2[:,1]
     k=0
     temp=0
     for i,j in zip(x,y):
@@ -167,7 +199,46 @@ def printTwoPaths(Points,route1,route2):
     plt.legend(handles=[red_patch,blue_patch])
     plt.show() 
 
+def buildData(filename): #read the files and build the vector
+    X=[]
+    int_list=[]
+    file = open(filename, "r") 
+    f= file.read()
+    numbers = re.findall(r"[-+]?\d*\.\d+|\d+", f)
+    int_list= [float(i) for i in numbers]
+    X = np.r_[X,int_list]
+    file.close
+    return X
 
+def optPdp(Points): 
+    n = len(Points) #Points supposed to be nx4 Points[0:1] origin, Points [2:3] destination. 
+    origin=Points[:,0:2]
+    destination=Points [:,2:4]
+    Adj=euclTsp(np.concatenate((origin,destination),axis=0))
+    shortest = 100000 #np.finfo(np.float128)
+    path=0
+    j=0
+    route=[]
+    Q=np.arange(2*n)
+    perm=itertools.permutations(Q)
+    for p in perm:
+    	if p[0]>n-1 :
+		break;
+	for i in range(0, 2*n-1):
+        	if (p[i]>n and i<p.index(p[i]-n)) or (p[i]==n and i<p.index(p[i]-n)):
+               		i=2*n+1
+			path=10000
+			
+			
+                else:   
+			path=path+Adj[p[i],p[i+1]]
+		        if path>shortest:
+               		   i=2*n+1
+	if path<shortest and path>0:
+           	shortest=path 
+           	route=p
+        path=0
+    return shortest, route
 
 
 
